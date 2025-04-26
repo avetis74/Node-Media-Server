@@ -11,6 +11,7 @@ pipeline {
         DOCKER_HUB_CREDS_USR = 'avetis74'
         DD_API_TOKEN = 'Authorization: Token 5c45847565eea7c9c5551f49ad8d72c64a72fa36'
         DT_API_TOKEN = 'odt_SfCq7Csub3peq7Y6lSlQy5Ngp9sSYpJl'
+        TRIVY_CACHE_DIR = .trivycache
         
     }
     parameters {
@@ -88,6 +89,35 @@ pipeline {
                 }
             }
         }
+
+        stage('trivy') {
+            when {
+                beforeAgent true
+                anyOf {
+                    expression { params.STAGE == 'all' }
+                    expression { params.STAGE == 'trivy' }
+                }
+            }
+            options {
+                timeout(time: 1, unit: 'HOURS')  // Таймаут для stage
+                retry(0)  // Отключаем повторные попытки
+            }
+            steps {
+                catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                    script {
+                        sh '''
+                            apk add --no-cache curl
+                            export TRIVY_VERSION=$(curl -s "https://api.github.com/repos/aquasecurity/trivy/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
+                            echo "$TRIVY_VERSION"
+                            curl -L https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz | tar -zxvf -
+                            docker pull "${DOCKER_HUB_REPO}:${DOCKER_IMAGE_TAG}"
+                            trivy image --exit-code 1 "${DOCKER_HUB_REPO}:${DOCKER_IMAGE_TAG}" cyclonedx --output sbom.cyclonedx.json
+                            '''
+                        archiveArtifacts artifacts: 'sbom.cyclonedx.json', allowEmptyArchive: true
+                    }
+                }
+            }
+        }
         
         stage('owasp_zap') {
             agent { label 'docker-agent-zap' }
@@ -117,6 +147,39 @@ pipeline {
                 }
             }
         }
+
+        stage('dependency_track') {
+            agent { label 'docker-agent-zap' }
+            when {
+                beforeAgent true
+                anyOf {
+                    expression { params.STAGE == 'all' }
+                    expression { params.STAGE == 'dependency_track' }
+                }
+            }
+            options {
+                timeout(time: 1, unit: 'HOURS')  // Таймаут для stage
+                retry(0)  // Отключаем повторные попытки
+            }
+            steps {
+                script {
+                    sh """
+                        apk --update add openjdk11 maven curl
+                        npm install -g @cyclonedx/cdxgen
+                        cdxgen -r -o ${WORKSPACE}/bom.json
+                        curl -vv -X POST https://s410-exam.cyber-ed.space:8080/api/v1/bom \
+                        -H "Content-type:multipart/form-data" \
+                        -H "X-Api-Key:${DT_API_TOKEN}" \
+                        -F "autoCreate=true" \
+                        -F "projectName=${JOB_NAME}" \
+                        -F "projectVersion=${BUILD_NUMBER}" \
+                        -F "bom=@${WORKSPACE}/bom.json"
+                    """
+                    archiveArtifacts artifacts: "bom.json", allowEmptyArchive: true
+                }
+            }
+        }
+        
         stage('DefectDojo') {
             steps {
                 script {
