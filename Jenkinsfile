@@ -182,7 +182,7 @@ pipeline {
                         pip3 install python-owasp-zap-v2.4 --break-system-packages
 
                         # Скачиваем и распаковываем ZAP
-                        ZAP_VERSION=\$(curl -s "https://api.github.com/repos/zaproxy/zaproxy/releases/latest" | grep -oP '"tag_name": "\\K[^"]+')
+                        ZAP_VERSION=\$(curl -s https://api.github.com/repos/zaproxy/zaproxy/releases/latest | sed -n 's/.*"tag_name": "\([^"]*\)".*/\1/p')
                         curl -sL "https://github.com/zaproxy/zaproxy/releases/download/\${ZAP_VERSION}/ZAP_\${ZAP_VERSION#v}_Linux.tar.gz" | tar -xz -C /opt
                         ln -s /opt/ZAP_*/zap.sh /usr/local/bin/zap
 
@@ -338,6 +338,86 @@ pipeline {
                     } else {
                         echo "Не удалось проверить репозиторий (HTTP ${response.status})"
                     }
+                }
+            }
+        }
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                script {
+                    // Клонируем репозиторий
+                    sh """
+                    git clone https://${GITLAB_TOKEN}@${REPO_URL.replace('https://', '')} ${SCAN_DIR}
+                    """
+                }
+            }
+        }
+
+        stage('Run Semgrep Scan') {
+            steps {
+                script {
+                    // Запускаем Semgrep и сохраняем результат в JSON
+                    sh """
+                    cd ${SCAN_DIR}
+                    semgrep scan --json -o semgrep-results.json
+                    """
+                }
+            }
+        }
+
+        stage('sast_semgrep_gitlab') {
+
+            environment {
+                // Получаем GitLab token из Jenkins credentials
+                GITLAB_TOKEN = credentials('gitlab-token')
+                REPO_URL = 'https://gitlab.cyber-ed.labs/your-repo.git'
+                SCAN_DIR = 'scanned-repo'
+            }
+        
+            triggers {
+                // Настройка расписания (например, каждый день в полночь)
+                cron('0 0 * * *')
+            }
+            steps {
+                script {
+                    sh """
+                    git clone https://${GITLAB_TOKEN}@${REPO_URL.replace('https://', '')} ${WORKSPACE}
+                    cd ${WORKSPACE}
+                    semgrep scan --json -o semgrep-results.json
+                    """
+                    // Парсим результаты Semgrep и формируем требуемый JSON
+                    def repoName = env.REPO_URL
+                    def semgrepOutput = readJSON file: "${WORKSPACE}/semgrep-results.json"
+
+                    def totalVulns = [
+                        high: 0,
+                        medium: 0,
+                        low: 0
+                    ]
+
+                    def vulnDetails = []
+
+                    semgrepOutput.results.each { result ->
+                        def severity = result.extra.metadata.severity.toLowerCase()
+                        if (totalVulns.containsKey(severity)) {
+                            totalVulns[severity] += 1
+                        }
+
+                        vulnDetails.add([
+                            name: result.check_id,
+                            details: result.extra.message
+                        ])
+                    }
+
+                    def finalOutput = [
+                        repo_name: repoName,
+                        total_vulns: totalVulns,
+                        vuln_details: vulnDetails
+                    ]
+                    // Сохраняем финальный JSON
+                    writeJSON file: 'scan-report.json', json: finalOutput
                 }
             }
         }
