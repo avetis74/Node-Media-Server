@@ -109,7 +109,8 @@ pipeline {
                 catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                     script {
                         sh '''
-                            apk add --no-cache curl jq
+                            apt update 
+                            apt install -y curl jq
 
                             # Получаем версию Trivy через jq (более надежный способ)
                             export TRIVY_VERSION=$(curl -s "https://api.github.com/repos/aquasecurity/trivy/releases/latest" | jq -r '.tag_name' | sed 's/^v//')
