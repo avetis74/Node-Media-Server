@@ -135,11 +135,27 @@ pipeline {
             steps {
                 script {
                     sh """
+                        # Устанавливаем зависимости
+                        apk add --no-cache openjdk11-jre-headless python3 py3-pip curl git
+                        pip3 install python-owasp-zap-v2.4
+
+                        # Скачиваем и распаковываем ZAP
+                        ZAP_VERSION=\$(curl -s "https://api.github.com/repos/zaproxy/zaproxy/releases/latest" | grep -oP '"tag_name": "\\K[^"]+')
+                        curl -sL "https://github.com/zaproxy/zaproxy/releases/download/\${ZAP_VERSION}/ZAP_\${ZAP_VERSION#v}_Linux.tar.gz" | tar -xz -C /opt
+                        ln -s /opt/ZAP_*/zap.sh /usr/local/bin/zap
+
+                        # Создаем директорию для отчетов
                         mkdir -p "${ZAP_REPORT_DIR}"
-                        python3 /zap/zap-full-scan.py -I -j -m 10 -T 60 -t https://s410-exam.cyber-ed.space:8084/admin \
+
+                        # Запускаем сканирование
+                        python3 /opt/ZAP_*/zap-full-scan.py \
+                            -I -j -m 10 -T 60 \
+                            -t "https://s410-exam.cyber-ed.space:8084/admin" \
                             -x "${ZAP_REPORT_DIR}/${ZAP_REPORT}" \
                             --hook=/zap/auth_hook.py \
-                            -z "auth.loginurl=https://s410-exam.cyber-ed.space:8084/admin ..."
+                            -z "auth.loginurl=https://s410-exam.cyber-ed.space:8084/admin..."
+
+                        # Копируем отчет
                         cp "${ZAP_REPORT_DIR}/${ZAP_REPORT}" .
                     """
                     archiveArtifacts artifacts: "${ZAP_REPORT}", allowEmptyArchive: true
