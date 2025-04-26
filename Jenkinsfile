@@ -91,6 +91,9 @@ pipeline {
         }
 
         stage('trivy') {
+            agent {
+                label: 'jenkins-agent-dind'
+            }
             when {
                 beforeAgent true
                 anyOf {
