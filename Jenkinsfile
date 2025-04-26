@@ -11,7 +11,7 @@ pipeline {
         DOCKER_HUB_CREDS_USR = 'avetis74'
         DD_API_TOKEN = 'Authorization: Token 5c45847565eea7c9c5551f49ad8d72c64a72fa36'
         DT_API_TOKEN = 'odt_SfCq7Csub3peq7Y6lSlQy5Ngp9sSYpJl'
-        TRIVY_CACHE_DIR = .trivycache
+        TRIVY_CACHE_DIR = '.trivycache'
         
     }
     parameters {
