@@ -92,7 +92,7 @@ pipeline {
 
         stage('trivy') {
             agent {
-                label 'ghcr.io/felipecrs/jenkins-agent-dind'
+                label 'dind'
             }
             when {
                 beforeAgent true
