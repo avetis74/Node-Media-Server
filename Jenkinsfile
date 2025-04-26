@@ -106,12 +106,20 @@ pipeline {
                 catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                     script {
                         sh '''
-                            apk add --no-cache curl
-                            export TRIVY_VERSION=$(curl -s "https://api.github.com/repos/aquasecurity/trivy/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
-                            echo "$TRIVY_VERSION"
-                            curl -L https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz | tar -zxvf -
+                            apk add --no-cache curl jq
+
+                            # Получаем версию Trivy через jq (более надежный способ)
+                            export TRIVY_VERSION=$(curl -s "https://api.github.com/repos/aquasecurity/trivy/releases/latest" | jq -r '.tag_name' | sed 's/^v//')
+                            echo "Устанавливаем Trivy версии: $TRIVY_VERSION"
+                            # Скачиваем и распаковываем Trivy
+                            curl -L "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" -o trivy.tar.gz
+                            tar -zxvf trivy.tar.gz
+                            rm trivy.tar.gz                           
+                            # Проверяем версию
+                            ./trivy --version
+                            # Анализируем образ
                             docker pull "${DOCKER_HUB_REPO}:${DOCKER_IMAGE_TAG}"
-                            trivy image --exit-code 1 "${DOCKER_HUB_REPO}:${DOCKER_IMAGE_TAG}" cyclonedx --output sbom.cyclonedx.json
+                            ./trivy image --exit-code 1 "${DOCKER_HUB_REPO}:${DOCKER_IMAGE_TAG}" cyclonedx --output sbom.cyclonedx.json
                             '''
                         archiveArtifacts artifacts: 'sbom.cyclonedx.json', allowEmptyArchive: true
                     }
