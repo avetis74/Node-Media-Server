@@ -179,7 +179,7 @@ pipeline {
                     sh """
                         # Устанавливаем зависимости
                         apk add --no-cache openjdk11-jre-headless python3 py3-pip curl git
-                        pip3 install python-owasp-zap-v2.4
+                        pip3 install python-owasp-zap-v2.4 --break-system-packages
 
                         # Скачиваем и распаковываем ZAP
                         ZAP_VERSION=\$(curl -s "https://api.github.com/repos/zaproxy/zaproxy/releases/latest" | grep -oP '"tag_name": "\\K[^"]+')
