@@ -343,6 +343,15 @@ pipeline {
         }
     }
     post {
-        always { cleanWs() }
+        always {
+            // очистка рабочего пространства / раннера
+            cleanWs()
+        }
+        failure {
+            echo "Pipeline failed due to security gate violation"
+        }
+        success {
+            echo "Pipeline completed - no High/Critical vuln. found"
+        }
     }
 }
