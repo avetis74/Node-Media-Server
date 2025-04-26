@@ -318,25 +318,25 @@ pipeline {
                         def foundCritical = result.issues.any { issue -> criticalIssues.contains(issue.type) }
                         
                         if (foundCritical) {
-                            error "🚨 Обнаружены критические проблемы в репозитории: " +
+                            error "Обнаружены критические проблемы в репозитории: " +
                                   result.issues.findAll { criticalIssues.contains(it.type) }.collect { it.type }.join(', ')
                         }
                         
                         // Не критические проблемы - просто выводим предупреждение
                         def otherIssues = result.issues.findAll { !criticalIssues.contains(it.type) }
                         if (otherIssues) {
-                            echo "⚠️ Обнаружены не критические проблемы:"
+                            echo "Обнаружены не критические проблемы:"
                             otherIssues.each { issue ->
                                 echo "  - ${issue.type}: ${issue.description}" 
                                 echo "    Подробнее: ${issue.details_url}"
                             }
                         } else {
-                            echo "✅ Репозиторий чист, проблем не обнаружено"
+                            echo "Репозиторий чист, проблем не обнаружено"
                         }
                     } else if (response.status == 404) {
-                        echo "ℹ️ Информация о репозитории не найдена в базе toxic-repos.ru"
+                        echo "Информация о репозитории не найдена в базе toxic-repos.ru"
                     } else {
-                        echo "⚠️ Не удалось проверить репозиторий (HTTP ${response.status})"
+                        echo "Не удалось проверить репозиторий (HTTP ${response.status})"
                     }
                 }
             }
