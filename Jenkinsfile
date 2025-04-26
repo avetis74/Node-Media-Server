@@ -218,7 +218,7 @@ pipeline {
             steps {
                 script {
                     sh """
-                        apk --update add openjdk11 maven curl
+                        apk --update add openjdk11 maven curl nodejs npm
                         npm install -g @cyclonedx/cdxgen
                         cdxgen -r -o ${WORKSPACE}/dependency-track-report.json
                         curl -vv -X POST https://s410-exam.cyber-ed.space:8080/api/v1/bom \
