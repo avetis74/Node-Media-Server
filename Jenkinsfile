@@ -40,26 +40,28 @@ pipeline {
 
     stages {
         stage('hadolint') {
-            when {
-                beforeAgent true
-                anyOf {
-                    expression { params.STAGE == 'all' }
-                    expression { params.STAGE == 'hadolint' }
+            catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                when {
+                    beforeAgent true
+                    anyOf {
+                        expression { params.STAGE == 'all' }
+                        expression { params.STAGE == 'hadolint' }
+                    }
                 }
-            }
-            options {
-                timeout(time: 1, unit: 'HOURS')  // Таймаут для stage
-                retry(0)  // Отключаем повторные попытки
-            }
-            steps {
-                script {
-                    sh """
-                        wget -O /usr/local/bin/hadolint https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64
-                        chmod +x /usr/local/bin/hadolint
-                        hadolint Dockerfile -f json > hadolint.json || exit 0
-                    """
-                    archiveArtifacts artifacts: 'hadolint.json', allowEmptyArchive: true
+                options {
+                    timeout(time: 1, unit: 'HOURS')  // Таймаут для stage
+                    retry(0)  // Отключаем повторные попытки
                 }
+                steps {
+                    script {
+                        sh """
+                            wget -O /usr/local/bin/hadolint https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64
+                            chmod +x /usr/local/bin/hadolint
+                            hadolint Dockerfile -f json > hadolint.json || exit 0
+                        """
+                        archiveArtifacts artifacts: 'hadolint.json', allowEmptyArchive: true
+                    }
+                }        
             }
         }
 
@@ -91,6 +93,38 @@ pipeline {
             }
         }
 
+        stage('build') {
+            when {
+                beforeAgent true
+                anyOf {
+                    expression { params.STAGE == 'all' }
+                    expression { params.STAGE == 'build' }
+                }
+            }
+            options {
+                timeout(time: 1, unit: 'HOURS')  // Таймаут для stage
+                retry(0)  // Отключаем повторные попытки
+            }
+            environment {
+                DOCKER_HUB_CREDS = credentials('docker_hub')
+            }
+            steps {
+                catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                    script {
+                        env.COMMIT_HASH = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()                    
+                        sh """
+                            docker build -t ${DOCKER_HUB_REPO}:${DOCKER_IMAGE_TAG} .
+                            docker tag ${DOCKER_HUB_REPO}:${DOCKER_IMAGE_TAG} ${DOCKER_HUB_REPO}:${env.COMMIT_HASH}
+                            echo "${DOCKER_HUB_CREDS_PSW}" | docker login -u "${DOCKER_HUB_CREDS_USR}" --password-stdin
+                            docker push ${DOCKER_HUB_REPO}:${DOCKER_IMAGE_TAG}
+                            docker push ${DOCKER_HUB_REPO}:${env.COMMIT_HASH}
+                            docker logout
+                        """
+                    }
+                }
+            }
+        }
+        
         stage('trivy') {
             when {
                 beforeAgent true
