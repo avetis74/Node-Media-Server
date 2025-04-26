@@ -91,9 +91,6 @@ pipeline {
         }
 
         stage('trivy') {
-            agent {
-                label 'dind'
-            }
             when {
                 beforeAgent true
                 anyOf {
@@ -132,7 +129,6 @@ pipeline {
         }
         
         stage('owasp_zap') {
-            agent { label 'docker-agent-zap' }
             when {
                 beforeAgent true
                 anyOf {
@@ -174,7 +170,6 @@ pipeline {
         }
 
         stage('dependency_track') {
-            agent { label 'docker-agent-zap' }
             when {
                 beforeAgent true
                 anyOf {
@@ -191,14 +186,14 @@ pipeline {
                     sh """
                         apk --update add openjdk11 maven curl
                         npm install -g @cyclonedx/cdxgen
-                        cdxgen -r -o ${WORKSPACE}/bom.json
+                        cdxgen -r -o ${WORKSPACE}/dependency-track-report.json
                         curl -vv -X POST https://s410-exam.cyber-ed.space:8080/api/v1/bom \
                         -H "Content-type:multipart/form-data" \
                         -H "X-Api-Key:${DT_API_TOKEN}" \
                         -F "autoCreate=true" \
                         -F "projectName=${JOB_NAME}" \
                         -F "projectVersion=${BUILD_NUMBER}" \
-                        -F "bom=@${WORKSPACE}/bom.json"
+                        -F "bom=@${WORKSPACE}/dependency-track-report.json"
                     """
                     archiveArtifacts artifacts: "bom.json", allowEmptyArchive: true
                 }
@@ -212,6 +207,9 @@ pipeline {
                             [scanType: 'Hadolint Dockerfile check', file: 'hadolint.json'],
                             [scanType: 'Semgrep JSON Report', file: 'report_semgrep.json'],
                             [scanType: 'ZAP Scan', file: "${ZAP_REPORT}"]
+                            [scanType: 'Trivy', file: "${ZAP_REPORT}"]
+                            [scanType: 'Trivy Scan', file: "sbom.cyclonedx.json"],
+                            [scanType: 'Dependency Track Finding Packaging Format (FPF) Export', file: "dependency-track-report.json"]
                         ]
                         scans.each { scan ->
                             if (fileExists(scan.file)) {
@@ -231,6 +229,73 @@ pipeline {
                 }
             }
         }
+        stage('security_gate') {
+            steps {
+                catchError(buildResult: 'FAILED', stageResult: 'FAILED') {
+                    script { 
+                        sh 'apk add --update jq'
+                        withCredentials([string(credentialsId: 'defectdojo_api_key', variable: 'DD_API_TOKEN')]) {
+                            def findings = sh(script: """
+                                curl -X GET "${DD_URL}/findings/?severity=High,Critical&risk_accepted=false&engagement=5" \
+                                -H "Authorization: Token ${DD_API_TOKEN}" \
+                                | jq '.count'
+                            """, returnStdout: true).trim()
+
+                            if (findings.toInteger() > 0) {
+                                error "Security Gate failed due to ${findings} High/Critical vulnerabilities. Пишите код корректно, блин!"
+                            } else {
+                                echo "Security Gate passed."
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Toxic Repo Check') {
+    steps {
+        script {
+            // Получаем информацию о репозитории
+            def repoUrl = scm.getUserRemoteConfigs()[0].getUrl()
+            def repoName = repoUrl.replaceFirst(/^https?:\/\/[^\/]+\//, "").replace(/\.git$/, "")
+            
+            echo "Проверяем репозиторий ${repoName} на toxic-repos.ru..."
+            
+            // Выполняем запрос к API toxic-repos.ru
+            def response = httpRequest url: "https://toxic-repos.ru/api/v1/check?repo=${URLEncoder.encode(repoName, 'UTF-8')}",
+                                     validResponseCodes: '200:404'
+            
+            if (response.status == 200) {
+                def result = readJSON text: response.content
+                
+                // Критические проблемы - прерываем сборку
+                def criticalIssues = ['malware', 'ddos', 'broken_assembly']
+                def foundCritical = result.issues.any { issue -> criticalIssues.contains(issue.type) }
+                
+                if (foundCritical) {
+                    error "🚨 Обнаружены критические проблемы в репозитории: " +
+                          result.issues.findAll { criticalIssues.contains(it.type) }.collect { it.type }.join(', ')
+                }
+                
+                // Не критические проблемы - просто выводим предупреждение
+                def otherIssues = result.issues.findAll { !criticalIssues.contains(it.type) }
+                if (otherIssues) {
+                    echo "⚠️ Обнаружены не критические проблемы:"
+                    otherIssues.each { issue ->
+                        echo "  - ${issue.type}: ${issue.description}" 
+                        echo "    Подробнее: ${issue.details_url}"
+                    }
+                } else {
+                    echo "✅ Репозиторий чист, проблем не обнаружено"
+                }
+            } else if (response.status == 404) {
+                echo "ℹ️ Информация о репозитории не найдена в базе toxic-repos.ru"
+            } else {
+                echo "⚠️ Не удалось проверить репозиторий (HTTP ${response.status})"
+            }
+        }
+    }
+}
     }
     post {
         always { cleanWs() }
