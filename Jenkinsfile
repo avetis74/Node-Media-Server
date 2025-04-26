@@ -92,7 +92,7 @@ pipeline {
 
         stage('trivy') {
             agent {
-                label 'jenkins-agent-dind'
+                label 'ghcr.io/felipecrs/jenkins-agent-dind'
             }
             when {
                 beforeAgent true
@@ -207,7 +207,6 @@ pipeline {
         stage('DefectDojo') {
             steps {
                 script {
-                    withCredentials([string(credentialsId: 'defectdojo_api_key', variable: 'DD_API_TOKEN')]) {
                         def scans = [
                             [scanType: 'Hadolint Dockerfile check', file: 'hadolint.json'],
                             [scanType: 'Semgrep JSON Report', file: 'report_semgrep.json'],
@@ -225,7 +224,7 @@ pipeline {
                                     -F "verified=true" \
                                     -F "skip_duplicates=true"
                                 """
-                            }
+                    
                         }
                     }
                 }
