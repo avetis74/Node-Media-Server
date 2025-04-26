@@ -372,7 +372,7 @@ pipeline {
             environment {
                 // Получаем GitLab token из Jenkins credentials
                 GITLAB_TOKEN = credentials('gitlab-token')
-                REPO_URL = 'https://gitlab.cyber-ed.labs/your-repo.git'
+                REPO_URL = 'https://gitlab.cyber-ed.labs/...'
                 SCAN_DIR = 'scanned-repo'
             }
         
