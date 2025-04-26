@@ -150,11 +150,8 @@ pipeline {
                         # Запускаем сканирование
                         python3 /opt/ZAP_*/zap-full-scan.py \
                             -I -j -m 10 -T 60 \
-                            -t "https://s410-exam.cyber-ed.space:8084/admin" \
-                            -x "${ZAP_REPORT_DIR}/${ZAP_REPORT}" \
-                            --hook=/zap/auth_hook.py \
-                            -z "auth.loginurl=https://s410-exam.cyber-ed.space:8084/admin..."
-
+                            -t "https://s410-exam.cyber-ed.space:8084" \
+                            -x "${ZAP_REPORT_DIR}/${ZAP_REPORT}"
                         # Копируем отчет
                         cp "${ZAP_REPORT_DIR}/${ZAP_REPORT}" .
                     """
