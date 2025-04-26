@@ -40,19 +40,19 @@ pipeline {
 
     stages {
         stage('hadolint') {
-            catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-                when {
-                    beforeAgent true
-                    anyOf {
-                        expression { params.STAGE == 'all' }
-                        expression { params.STAGE == 'hadolint' }
-                    }
+            when {
+                beforeAgent true
+                anyOf {
+                    expression { params.STAGE == 'all' }
+                    expression { params.STAGE == 'hadolint' }
                 }
-                options {
-                    timeout(time: 1, unit: 'HOURS')  // Таймаут для stage
-                    retry(0)  // Отключаем повторные попытки
-                }
-                steps {
+            }
+            options {
+                timeout(time: 1, unit: 'HOURS')  // Таймаут для stage
+                retry(0)  // Отключаем повторные попытки
+            }
+            steps {
+                catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                     script {
                         sh """
                             wget -O /usr/local/bin/hadolint https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64
