@@ -27,6 +27,7 @@ pipeline {
                 'trivy',
                 'defectdojo',
                 'security_gate',
+                'Toxic Repo Check',
             ],
             description: 'Выберите "all" для выполнения всех стадий или конкретную стадию'
         )
@@ -253,49 +254,49 @@ pipeline {
         }
 
         stage('Toxic Repo Check') {
-    steps {
-        script {
-            // Получаем информацию о репозитории
-            def repoUrl = scm.getUserRemoteConfigs()[0].getUrl()
-            def repoName = repoUrl.replaceFirst(/^https?:\/\/[^\/]+\//, "").replace(/\.git$/, "")
-            
-            echo "Проверяем репозиторий ${repoName} на toxic-repos.ru..."
-            
-            // Выполняем запрос к API toxic-repos.ru
-            def response = httpRequest url: "https://toxic-repos.ru/api/v1/check?repo=${URLEncoder.encode(repoName, 'UTF-8')}",
-                                     validResponseCodes: '200:404'
-            
-            if (response.status == 200) {
-                def result = readJSON text: response.content
-                
-                // Критические проблемы - прерываем сборку
-                def criticalIssues = ['malware', 'ddos', 'broken_assembly']
-                def foundCritical = result.issues.any { issue -> criticalIssues.contains(issue.type) }
-                
-                if (foundCritical) {
-                    error "🚨 Обнаружены критические проблемы в репозитории: " +
-                          result.issues.findAll { criticalIssues.contains(it.type) }.collect { it.type }.join(', ')
-                }
-                
-                // Не критические проблемы - просто выводим предупреждение
-                def otherIssues = result.issues.findAll { !criticalIssues.contains(it.type) }
-                if (otherIssues) {
-                    echo "⚠️ Обнаружены не критические проблемы:"
-                    otherIssues.each { issue ->
-                        echo "  - ${issue.type}: ${issue.description}" 
-                        echo "    Подробнее: ${issue.details_url}"
+            steps {
+                script {
+                    // Получаем информацию о репозитории
+                    def repoUrl = scm.getUserRemoteConfigs()[0].getUrl()
+                    def repoName = repoUrl.replaceFirst(/^https?:\/\/[^\/]+\//, "").replace(/\.git$/, "")
+                    
+                    echo "Проверяем репозиторий ${repoName} на toxic-repos.ru..."
+                    
+                    // Выполняем запрос к API toxic-repos.ru
+                    def response = httpRequest url: "https://toxic-repos.ru/api/v1/check?repo=${URLEncoder.encode(repoName, 'UTF-8')}",
+                                             validResponseCodes: '200:404'
+                    
+                    if (response.status == 200) {
+                        def result = readJSON text: response.content
+                        
+                        // Критические проблемы - прерываем сборку
+                        def criticalIssues = ['malware', 'ddos', 'broken_assembly']
+                        def foundCritical = result.issues.any { issue -> criticalIssues.contains(issue.type) }
+                        
+                        if (foundCritical) {
+                            error "🚨 Обнаружены критические проблемы в репозитории: " +
+                                  result.issues.findAll { criticalIssues.contains(it.type) }.collect { it.type }.join(', ')
+                        }
+                        
+                        // Не критические проблемы - просто выводим предупреждение
+                        def otherIssues = result.issues.findAll { !criticalIssues.contains(it.type) }
+                        if (otherIssues) {
+                            echo "⚠️ Обнаружены не критические проблемы:"
+                            otherIssues.each { issue ->
+                                echo "  - ${issue.type}: ${issue.description}" 
+                                echo "    Подробнее: ${issue.details_url}"
+                            }
+                        } else {
+                            echo "✅ Репозиторий чист, проблем не обнаружено"
+                        }
+                    } else if (response.status == 404) {
+                        echo "ℹ️ Информация о репозитории не найдена в базе toxic-repos.ru"
+                    } else {
+                        echo "⚠️ Не удалось проверить репозиторий (HTTP ${response.status})"
                     }
-                } else {
-                    echo "✅ Репозиторий чист, проблем не обнаружено"
                 }
-            } else if (response.status == 404) {
-                echo "ℹ️ Информация о репозитории не найдена в базе toxic-repos.ru"
-            } else {
-                echo "⚠️ Не удалось проверить репозиторий (HTTP ${response.status})"
             }
         }
-    }
-}
     }
     post {
         always { cleanWs() }
