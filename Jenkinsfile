@@ -344,29 +344,6 @@ pipeline {
     }
 
     stages {
-        stage('Clone Repository') {
-            steps {
-                script {
-                    // Клонируем репозиторий
-                    sh """
-                    git clone https://${GITLAB_TOKEN}@${REPO_URL.replace('https://', '')} ${SCAN_DIR}
-                    """
-                }
-            }
-        }
-
-        stage('Run Semgrep Scan') {
-            steps {
-                script {
-                    // Запускаем Semgrep и сохраняем результат в JSON
-                    sh """
-                    cd ${SCAN_DIR}
-                    semgrep scan --json -o semgrep-results.json
-                    """
-                }
-            }
-        }
-
         stage('sast_semgrep_gitlab') {
 
             environment {
