@@ -107,8 +107,7 @@ pipeline {
                 catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                     script {
                         sh '''
-                            apt update 
-                            apt install -y curl jq
+                           apk add --update curl jq
 
                             # Получаем версию Trivy через jq (более надежный способ)
                             export TRIVY_VERSION=$(curl -s "https://api.github.com/repos/aquasecurity/trivy/releases/latest" | jq -r '.tag_name' | sed 's/^v//')
@@ -207,10 +206,10 @@ pipeline {
                         def scans = [
                             [scanType: 'Hadolint Dockerfile check', file: 'hadolint.json'],
                             [scanType: 'Semgrep JSON Report', file: 'report_semgrep.json'],
-                            [scanType: 'ZAP Scan', file: "${ZAP_REPORT}"]
-                            [scanType: 'Trivy', file: "${ZAP_REPORT}"]
+                            [scanType: 'ZAP Scan', file: "${ZAP_REPORT}"],
+                            [scanType: 'Trivy', file: "${ZAP_REPORT}"],
                             [scanType: 'Trivy Scan', file: "sbom.cyclonedx.json"],
-                            [scanType: 'Dependency Track Finding Packaging Format (FPF) Export', file: "dependency-track-report.json"]
+                            [scanType: 'Dependency Track Finding Packaging Format (FPF) Export', file: "dependency-track-report.json"],
                         ]
                         scans.each { scan ->
                             if (fileExists(scan.file)) {
