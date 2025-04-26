@@ -7,7 +7,7 @@ pipeline {
         ZAP_REPORT_DIR = './zap-reports/'
         ZAP_REPORT = 'report_site.xml'
         DD_URL = 'https://s410-exam.cyber-ed.space:8083'
-        DOCKER_HUB_CREDS_PSW = 'dckr_pat_OCWAhXGnlo9pP5fpInJRUnh2HrU'
+        DOCKER_HUB_CREDS_PSW = 'dckr_pat_OCWAhXGnlo9pP5fpInJRUnh'
         DOCKER_HUB_CREDS_USR = 'avetis74'
         DD_API_TOKEN = 'Authorization: Token 5c45847565eea7c9c5551f49ad8d72c64a72fa36'
         DT_API_TOKEN = 'odt_SfCq7Csub3peq7Y6lSlQy5Ngp9sSYpJl'
