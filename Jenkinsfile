@@ -27,7 +27,7 @@ pipeline {
                 'trivy',
                 'defectdojo',
                 'security_gate',
-                'Toxic Repo Check',
+                'Toxic_Repo_Check',
             ],
             description: 'Выберите "all" для выполнения всех стадий или конкретную стадию'
         )
@@ -253,7 +253,18 @@ pipeline {
             }
         }
 
-        stage('Toxic Repo Check') {
+        stage('Toxic_Repo_Check') {
+            when {
+                beforeAgent true
+                anyOf {
+                    expression { params.STAGE == 'all' }
+                    expression { params.STAGE == 'Toxic_Repo_Check' }
+                }
+            }
+            options {
+                timeout(time: 1, unit: 'HOURS')  // Таймаут для stage
+                retry(0)  // Отключаем повторные попытки
+            }
             steps {
                 script {
                     // Получаем информацию о репозитории
